@@ -128,6 +128,10 @@ async def get_participation_format(query, state):
         await state.update_data(accept='Нет')
     data = await state.get_data()
     user_id = data['chat_id']
+    DATA={'name': data['name'], 'job':data['job'], 'place_job':data['place_job'], 
+    'participation_format':data['participation_format'], 'IsSmi':data['IsSmi'], 
+    'Cuntry':data['Cuntry'], 'Subject':data['Subject'], 'Town':data['Town'],
+    'Email':data['Email'], 'Email':data['Email'], 'accept':data['accept']}
     await state.finish()
     await bot.send_message(chat_id=user_id, text='Вы успешно зарегестрированы!', reply_markup=await buttons.HomeButton()) 
     
