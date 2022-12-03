@@ -20,41 +20,140 @@ dp = Dispatcher(bot, storage=storage)
 class UserState(StatesGroup):
     start = State()
     sing_up = State()
-    f_name = State()
-    s_name = State()
-    l_name = State()
-
+    name = State()
+    job = State()
+    place_job = State()
+    participation_format = State()
+    Is_SMI = State()
+    Cuntry = State()
+    subject_RF = State()
+    Town = State()
+    Email = State()
+    accept = State()
+    Done = State()
+    
 
 
 @dp.message_handler(commands=['start'])
 async def process_start_command(message):
     KB = await buttons.StartButtons()
-    await message.reply("Выберете нужный раздел", reply_markup=KB)
+    user_id = message.from_user.id
+    await bot.send_message(chat_id=user_id, text="Выберете нужный раздел", reply_markup=KB)
 
 @dp.callback_query_handler(text='start')
 async def start_message(query):
     if query.data == 'start':
         KB = await buttons.StartButtons()
-        await query.message.reply("Выберете нужный раздел", reply_markup=KB)
+        user_id = query.from_user.id
+        await bot.send_message(chat_id=user_id, text="Выберете нужный раздел", reply_markup=KB)
+
+@dp.message_handler(state=UserState.name)
+async def get_username(message: types.Message, state):
+    await state.update_data(name=message.text)
+    user_id = message.from_user.id
+    await bot.send_message(chat_id=user_id, text='Введите Вашу должность')
+    await UserState.job.set()
+
+@dp.message_handler(state=UserState.job)
+async def get_Job(message: types.Message, state):
+    await state.update_data(job=message.text)
+    user_id = message.from_user.id
+    await bot.send_message(chat_id=user_id, text='Введите Ваше место работы')
+    await UserState.place_job.set()
+    
+@dp.message_handler(state=UserState.place_job)
+async def get_PlaceJob(message: types.Message, state):
+    await state.update_data(place_job=message.text)
+    KB = await buttons.format_p()
+    user_id = message.from_user.id
+    await state.update_data(chat_id=user_id)
+    await bot.send_message(chat_id=user_id, text='Введите формат участия в мероприятии', reply_markup=KB)
+    
+@dp.callback_query_handler(lambda c: c.data.__eq__('full-time'), state=UserState.place_job)
+@dp.callback_query_handler(lambda c: c.data == 'absentia', state=UserState.place_job)
+async def get_participation_format(query, state):
+    if query.data == 'full-time':
+        await state.update_data(participation_format='Очно')
+    if query.data == 'absentia':
+        await state.update_data(participation_format='Заочно')
+    data = await state.get_data()
+    user_id = data['chat_id']
+    await bot.send_message(chat_id=user_id, text='Вы представитель СМИ?', reply_markup= await buttons.Is_SMI())
+    await UserState.Is_SMI.set()
+
+@dp.callback_query_handler(lambda c: c.data.__eq__('IsSMI'), state=UserState.Is_SMI)
+@dp.callback_query_handler(lambda c: c.data == 'NotSMI', state=UserState.Is_SMI)
+async def get_participation_format(query, state):
+    if query.data == 'IsSmi':
+        await state.update_data(IsSmi='Да')
+    if query.data == 'NotSmi':
+        await state.update_data(IsSmi='Нет')
+    await query.message.reply("В какой стране вы проживаете?")
+    await UserState.Cuntry.set()
+
+@dp.message_handler(state=UserState.Cuntry)
+async def get_subject(message: types.Message, state):
+    await state.update_data(Cuntry=message.text)
+    user_id = message.from_user.id
+    await bot.send_message(chat_id=user_id, text='Введите Вашу область')
+    await UserState.subject_RF.set()
+
+@dp.message_handler(state=UserState.subject_RF)
+async def get_Town(message: types.Message, state):
+    await state.update_data(Subject=message.text)
+    user_id = message.from_user.id
+    await bot.send_message(chat_id=user_id, text='Введите Ваш город')
+    await UserState.Town.set()
+
+@dp.message_handler(state=UserState.Town)
+async def get_Email(message: types.Message, state):
+    await state.update_data(Town=message.text)
+    user_id = message.from_user.id
+    await bot.send_message(chat_id=user_id, text='Введите Ваш Email')
+    await UserState.Email.set()
+
+@dp.message_handler(state=UserState.Email)
+async def get_accept(message: types.Message, state):
+    await state.update_data(Email=message.text)
+    user_id = message.from_user.id
+    KB = await buttons.PersonalData()
+    await bot.send_message(chat_id=user_id, text='Вы согласны на обработку персональных данных', reply_markup=KB)
+    
+@dp.callback_query_handler(lambda c: c.data == 'Yes', state=UserState.Email)
+@dp.callback_query_handler(lambda c: c.data == 'No', state=UserState.Email)
+async def get_participation_format(query, state):
+    if query.data == 'Yes':
+        await state.update_data(accept='Да')
+    if query.data == 'No':
+        await state.update_data(accept='Нет')
+    data = await state.get_data()
+    user_id = data['chat_id']
+    await bot.send_message(chat_id=user_id, text='Вы успешно зарегестрированы!', reply_markup=await buttons.HomeButton()) 
+    
+
+
 
 @dp.callback_query_handler()
 async def Menu(query: types.CallbackQuery):
     if query.data == 'About Event':
-        KB = InlineKeyboardMarkup(resize_keyboard=True).add(InlineKeyboardButton(text='Вернуться в меню', callback_data='start'))
+        KB = await buttons.HomeButton()
         await query.message.reply("ITFESTINFO", reply_markup=KB)
-        UserState.start.set()
+        await UserState.start.set()
 
     if query.data == 'Spickers':
-        KB = InlineKeyboardMarkup(resize_keyboard=True).add(InlineKeyboardButton(text='Вернуться в меню', callback_data='start'))
+        KB =await  buttons.HomeButton()
         await query.message.reply("Спикеры", reply_markup=KB)
-        UserState.start.set()
+        await UserState.start.set()
         
     if query.data == 'Programm event':
-        KB = InlineKeyboardMarkup(resize_keyboard=True).add(InlineKeyboardButton(text='Вернуться в меню', callback_data='start'))
+        KB =await buttons.HomeButton()
         await query.message.reply("Программа мероприятия", reply_markup=KB)
-        UserState.start.set()
-        
-    
+        await UserState.start.set()
+    if query.data == 'singup':
+        user_id = query.from_user.id
+        await bot.send_message(chat_id=user_id, text='Введите Ваши ФИО в формате:\nФамилия Имя Отчество')
+        await UserState.name.set()
+   
 
 
 if __name__ == '__main__':
