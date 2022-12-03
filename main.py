@@ -128,27 +128,23 @@ async def get_participation_format(query, state):
         await state.update_data(accept='Нет')
     data = await state.get_data()
     user_id = data['chat_id']
+    await state.finish()
     await bot.send_message(chat_id=user_id, text='Вы успешно зарегестрированы!', reply_markup=await buttons.HomeButton()) 
     
-
-
-
 @dp.callback_query_handler()
 async def Menu(query: types.CallbackQuery):
     if query.data == 'About Event':
         KB = await buttons.HomeButton()
         await query.message.reply("ITFESTINFO", reply_markup=KB)
-        await UserState.start.set()
 
     if query.data == 'Spickers':
         KB =await  buttons.HomeButton()
         await query.message.reply("Спикеры", reply_markup=KB)
-        await UserState.start.set()
         
     if query.data == 'Programm event':
         KB =await buttons.HomeButton()
         await query.message.reply("Программа мероприятия", reply_markup=KB)
-        await UserState.start.set()
+
     if query.data == 'singup':
         user_id = query.from_user.id
         await bot.send_message(chat_id=user_id, text='Введите Ваши ФИО в формате:\nФамилия Имя Отчество')
