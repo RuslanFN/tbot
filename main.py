@@ -6,6 +6,7 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.types import ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 import buttons
+from sqlmethods import connect_db, insert_to, InTable
 
 dotenv_path = os.path.join(os.path.dirname(__file__), 'env.env')
 if os.path.exists(dotenv_path):
@@ -31,18 +32,19 @@ class UserState(StatesGroup):
     Email = State()
     accept = State()
     Done = State()
-    
 
-
+ 
 @dp.message_handler(commands=['start'])
 async def process_start_command(message):
     KB = await buttons.StartButtons()
     user_id = message.from_user.id
+    await connect_db()  
     await bot.send_message(chat_id=user_id, text="Выберете нужный раздел", reply_markup=KB)
 
 @dp.callback_query_handler(text='start')
 async def start_message(query):
     if query.data == 'start':
+        print(await connect_db())  
         KB = await buttons.StartButtons()
         user_id = query.from_user.id
         await bot.send_message(chat_id=user_id, text="Выберете нужный раздел", reply_markup=KB)
@@ -51,14 +53,14 @@ async def start_message(query):
 async def get_username(message: types.Message, state):
     await state.update_data(name=message.text)
     user_id = message.from_user.id
-    await bot.send_message(chat_id=user_id, text='Введите Вашу должность')
+    await bot.send_message(chat_id=user_id, text='Введите Вашу должность', reply_markup=await buttons.HomeButton())
     await UserState.job.set()
 
 @dp.message_handler(state=UserState.job)
 async def get_Job(message: types.Message, state):
     await state.update_data(job=message.text)
     user_id = message.from_user.id
-    await bot.send_message(chat_id=user_id, text='Введите Ваше место работы')
+    await bot.send_message(chat_id=user_id, text='Введите Ваше место работы', reply_markup=await buttons.HomeButton())
     await UserState.place_job.set()
     
 @dp.message_handler(state=UserState.place_job)
@@ -84,9 +86,9 @@ async def get_participation_format(query, state):
 @dp.callback_query_handler(lambda c: c.data.__eq__('IsSMI'), state=UserState.Is_SMI)
 @dp.callback_query_handler(lambda c: c.data == 'NotSMI', state=UserState.Is_SMI)
 async def get_participation_format(query, state):
-    if query.data == 'IsSmi':
+    if query.data == 'IsSMI':
         await state.update_data(IsSmi='Да')
-    if query.data == 'NotSmi':
+    if query.data == 'NotSMI':
         await state.update_data(IsSmi='Нет')
     await query.message.reply("В какой стране вы проживаете?")
     await UserState.Cuntry.set()
@@ -95,21 +97,21 @@ async def get_participation_format(query, state):
 async def get_subject(message: types.Message, state):
     await state.update_data(Cuntry=message.text)
     user_id = message.from_user.id
-    await bot.send_message(chat_id=user_id, text='Введите Вашу область')
+    await bot.send_message(chat_id=user_id, text='Введите Вашу область', reply_markup=await buttons.HomeButton())
     await UserState.subject_RF.set()
 
 @dp.message_handler(state=UserState.subject_RF)
 async def get_Town(message: types.Message, state):
     await state.update_data(Subject=message.text)
     user_id = message.from_user.id
-    await bot.send_message(chat_id=user_id, text='Введите Ваш город')
+    await bot.send_message(chat_id=user_id, text='Введите Ваш город', reply_markup=await buttons.HomeButton())
     await UserState.Town.set()
 
 @dp.message_handler(state=UserState.Town)
 async def get_Email(message: types.Message, state):
     await state.update_data(Town=message.text)
     user_id = message.from_user.id
-    await bot.send_message(chat_id=user_id, text='Введите Ваш Email')
+    await bot.send_message(chat_id=user_id, text='Введите Ваш Email', reply_markup=await buttons.HomeButton())
     await UserState.Email.set()
 
 @dp.message_handler(state=UserState.Email)
@@ -131,9 +133,20 @@ async def get_participation_format(query, state):
     DATA={'name': data['name'], 'job':data['job'], 'place_job':data['place_job'], 
     'participation_format':data['participation_format'], 'IsSmi':data['IsSmi'], 
     'Cuntry':data['Cuntry'], 'Subject':data['Subject'], 'Town':data['Town'],
-    'Email':data['Email'], 'Email':data['Email'], 'accept':data['accept']}
+    'Email':data['Email'], 'accept':data['accept'],'user_id':query.message.from_user.id}
     await state.finish()
-    await bot.send_message(chat_id=user_id, text='Вы успешно зарегестрированы!', reply_markup=await buttons.HomeButton()) 
+    message_str = f"ФИО: { data['name']}, Должность: {data['job']}, Место работы: {data['place_job']},Очно/Заочно: {data['participation_format']}, Вы сотрудник СМИ?: {data['IsSmi']}, Страна: {data['Cuntry']}, Область: {data['Subject']}, Город: {data['Town']}, Почта: {data['Email']}, Согласие на обработку перс. данных: {data['accept']}"
+    if await connect_db() == "Соединение с SQLite закрыто":
+        if not await InTable(DATA['user_id'], DATA['Email']):
+            if await insert_to(DATA) == "Соединение с SQLite закрыто":
+                await bot.send_message(chat_id=user_id, text=message_str)
+                await bot.send_message(chat_id=user_id, text='Вы успешно зарегестрированы!', reply_markup=await buttons.HomeButton()) 
+            else:
+                await bot.send_message(chat_id=user_id, text='Ошибка регистрации!', reply_markup=await buttons.HomeButton()) 
+        else:
+            await bot.send_message(chat_id=user_id, text='Такой пользователь уже существует!', reply_markup=await buttons.HomeButton())
+    else:
+         await bot.send_message(chat_id=user_id, text='Ошибка регистрации!', reply_markup=await buttons.HomeButton())  
     
 @dp.callback_query_handler()
 async def Menu(query: types.CallbackQuery):
